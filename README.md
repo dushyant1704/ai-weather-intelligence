@@ -1,43 +1,160 @@
-# AI Weather Intelligence and Decision Support System
+# 🌤️ AI Weather Intelligence & Decision Support System
 
-## Requirements
-- Node.js 20.19+ or 22.12+ (Vite 7 requirement)
-- An OpenWeather API key
-- Internet access for live weather and geocoding
+An intelligent, multi-agent weather analytics and autonomous decision support platform. Instead of presenting raw numbers alone, this system synthesizes real-time meteorological telemetry through coordinated AI agents to provide actionable recommendations for daily activities, outdoor plans, safety risks, and travel.
 
-## Security and environment
-The uploaded API key was removed from this distribution. Since it was pasted into a conversation, revoke/regenerate it in your OpenWeather account before use.
+---
 
-1. Copy `backend/.env.example` to `backend/.env`.
-2. Put your newly generated key in `OPENWEATHER_API_KEY`.
-3. Copy root `.env.example` to root `.env` if you want to configure `VITE_API_BASE_URL`. The default is `http://localhost:5000/api`.
-4. Never put an API secret in a `VITE_*` variable. Vite exposes `VITE_*` values to browser code.
+## 📌 Project Overview & Basic Idea
 
-## Start the backend (Terminal 1)
+Traditional weather apps only display isolated statistics—temperatures, percentages, and icons—leaving users to deduce whether conditions are safe or ideal for their specific plans. 
+
+**AI Weather Intelligence** bridges that gap:
+- **Natural Language Interaction**: Users ask real-world questions (e.g., *"Should I go running today?"*, *"Is it safe for cycling this afternoon?"*, or *"Compare weather in London and Paris for sightseeing"*).
+- **Autonomous Multi-Agent Orchestration**: A central AI Orchestrator interprets user intent and delegates tasks across specialized agents (Data Quality, Risk Assessment, Forecast Trends, Activity Decision, and Reasoning).
+- **Actionable Guidance**: The system evaluates compound environmental risks (such as high heat combined with humidity or rain probability with gusty winds) and outputs an **Executive Decision Verdict**, suitability scores (0–100), risk gauges, and trajectory forecasts.
+
+---
+
+## ⚙️ How It Works (System Architecture & Workflow)
+
+```
+       ┌────────────────────────────────────────────────────────┐
+       │             User Query / Activity Question              │
+       └───────────────────────────┬────────────────────────────┘
+                                   │
+                                   ▼
+       ┌────────────────────────────────────────────────────────┐
+       │              AI Weather Orchestrator Agent             │
+       │  • Natural language intent recognition                 │
+       │  • Activity & entity extraction                        │
+       │  • Dynamic execution plan generation                   │
+       └───────────────────────────┬────────────────────────────┘
+                                   │
+                                   ▼
+       ┌────────────────────────────────────────────────────────┐
+       │           1. Data Intelligence Agent (Quality Gate)     │
+       │  • Validates live OpenWeather sensor inputs            │
+       │  • Checks completeness & telemetry integrity           │
+       └───────────────────────────┬────────────────────────────┘
+                                   │ Passed (>80% Quality Gate)
+        ┌──────────────────────────┼──────────────────────────┐
+        ▼                          ▼                          ▼
+┌──────────────────┐     ┌───────────────────┐     ┌─────────────────────┐
+│ 2. Risk Agent    │     │ 3. Trend Agent    │     │ 4. Reasoning Agent  │
+│ • Heat / Thermal │     │ • 40-step horizon │     │ • Bio-comfort model │
+│ • UV Radiation   │     │ • Trend deltas    │     │ • Atmospheric       │
+│ • Rain & Wind    │     │ • Trajectory      │     │   observations      │
+│ • Visibility     │     │   (Worsening /    │     └─────────────────────┘
+│ • Cross-effects  │     │    Improving)     │
+└────────┬─────────┘     └─────────┬─────────┘
+         │                         │
+         └────────────┬────────────┘
+                      ▼
+       ┌────────────────────────────────────────────────────────┐
+       │              5. Activity Decision Agent                │
+       │  • Calculates Suitability Score (0–100)                │
+       │  • Adjusts for forward forecast trajectory             │
+       │  • Generates Favorable vs. Caution factor breakdown    │
+       │  • Produces clear Natural-Language Recommendation      │
+       └───────────────────────────┬────────────────────────────┘
+                                   │
+                                   ▼
+       ┌────────────────────────────────────────────────────────┐
+       │           Executive Frontend Results Dashboard         │
+       │  • Hero Verdict Card & One-Click Copy                  │
+       │  • 4 KPI Metric Cards (Suitability, Risk, Trend, Data) │
+       │  • Categorized Tabs: Risk Radar, Shifts, Comfort, JSON │
+       └────────────────────────────────────────────────────────┘
+```
+
+### Detailed Agent Roles:
+
+1. **AI Orchestrator (`orchestratorAgent.js`)**:
+   - Parses the user prompt, determines the primary intent (activity check, risk assessment, general forecast, or city comparison), selects the active city coordinates, and maps out an optimal agent execution plan.
+2. **Data Intelligence Agent (`dataIntelligenceAgent.js`)**:
+   - Acts as a quality gatekeeper. Validates numerical ranges for temperature, humidity, wind, UV, and pressure. Ensures data sufficiency before allowing downstream AI computations.
+3. **Risk Intelligence Agent (`riskIntelligenceAgent.js`)**:
+   - Computes weighted risk indices across 5 dimensions: **Heat Stress**, **UV Exposure**, **Precipitation**, **Wind Velocity**, and **Visibility**.
+   - Detects complex parameter interactions (e.g., moderate heat + high humidity = heightened thermal exhaustion hazard).
+4. **Forecast Trend Agent (`forecastTrendAgent.js`)**:
+   - Ingests 40 multi-hour forecast records to calculate moving slopes, identifying whether conditions are **IMPROVING**, **STABLE**, or **WORSENING**, and pinpointing exact shifts in temperature, rain chance, and wind.
+5. **Activity Decision Agent (`activityDecisionAgent.js`)**:
+   - Combines activity risk with the forecast trend offset to classify suitability:
+     - `EXCELLENT` (≥80) • `GOOD` (≥65) • `MODERATE` (≥45) • `POOR` (≥25) • `UNSUITABLE` (<25)
+   - Compiles positive green-flag factors, cautionary watch points, and final actionable advice.
+6. **Weather Reasoning Agent (`weatherReasoningAgent.js`)**:
+   - Performs thermal comfort modeling (`Comfortable`, `Cool`, `Uncomfortable`, `Very Uncomfortable`) and explains physiological sensations.
+7. **City Intelligence Agent (`cityIntelligenceAgent.js`)**:
+   - Ranks multiple destinations side-by-side for travel and event planning, spotlighting winner margins.
+
+---
+
+## 💻 Tech Stack
+
+- **Frontend**:
+  - React 19 + Vite 7
+  - Lucide React (Visual icon system)
+  - Recharts (Interactive temperature, humidity, and distribution charts)
+  - Custom CSS Design System (Tailored blue palette with Dark & Light theme tokens)
+- **Backend**:
+  - Node.js (ES Modules)
+  - Express 5
+  - OpenWeatherMap API (Current weather, 5-day / 3-hour forecasts, Geocoding)
+  - Multi-Agent Orchestration Engine
+
+---
+
+## 🚀 Getting Started
+
+### 1. Prerequisites
+- Node.js `20.19+` or `22.12+`
+- An [OpenWeatherMap API key](https://openweathermap.org/api)
+
+### 2. Configure Environment Variables
+
+**Backend (`backend/.env`):**
+```env
+PORT=5000
+FRONTEND_URL=http://localhost:5173
+NODE_ENV=development
+OPENWEATHER_API_KEY=your_openweather_api_key_here
+```
+
+**Frontend (`.env`):**
+```env
+VITE_API_BASE_URL=http://localhost:5000/api
+```
+
+### 3. Run the Backend (Terminal 1)
 ```powershell
 cd backend
 npm install
 npm run dev
 ```
-Backend default: http://localhost:5000
+Backend will be available at: `http://localhost:5000`
 
-## Start the frontend (Terminal 2, project root)
+### 4. Run the Frontend (Terminal 2)
 ```powershell
+# From the project root
 npm install
 npm run dev
 ```
-Open the Vite URL printed in the terminal (usually http://localhost:5173).
+Open the printed Vite URL in your browser (typically `http://localhost:5173`).
 
-## Orchestrator endpoints
-- `GET /api/orchestrator/route?query=...&lat=...&lon=...` creates a routing plan.
-- `GET /api/orchestrator/execute?query=...&lat=...&lon=...` executes the plan.
-- `POST /api/orchestrator/execute` accepts JSON with `query`, optional `lat`/`lon`, and optional supported input fields.
+---
 
-## AI Intelligence frontend
-Use the **AI Intelligence** item in the sidebar. Load a city in the weather dashboard first so the current coordinates can be included in the orchestrator request.
+## 📡 Key Orchestrator API Endpoints
 
-## Troubleshooting
-- `OPENWEATHER_API_KEY is not configured`: create `backend/.env` from the example and add your key.
-- `City not found`: check API key validity, OpenWeather geocoding access, and backend terminal output.
-- Browser cannot reach backend: ensure both terminals are running and `FRONTEND_URL` matches the Vite origin.
-- Insufficient weather data: inspect the Data Intelligence validation checks; do not disable the quality gate just to force a successful response.
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/api/orchestrator/route?query=...&lat=...&lon=...` | Generates the orchestration execution plan. |
+| `GET` | `/api/orchestrator/execute?query=...&lat=...&lon=...` | Executes multi-agent analysis for a given query and coordinates. |
+| `POST` | `/api/orchestrator/execute` | Executes analysis with a JSON payload (`query`, `lat`, `lon`, `activity`). |
+| `GET` | `/api/weather/current?city=...` | Fetches normalized current weather conditions. |
+| `GET` | `/api/weather/forecast?lat=...&lon=...` | Fetches 5-day / 3-hour forecast telemetry. |
+
+---
+
+## 🛡️ Security Best Practices
+- Never commit `.env` files with secret API keys. Keep all keys server-side in `backend/.env`.
+- Frontend code only interacts through the proxy backend server or exposed non-secret Vite variables.
