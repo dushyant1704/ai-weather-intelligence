@@ -9,6 +9,16 @@ const getClassification = (score) => {
   return "UNSUITABLE";
 };
 
+export const ACTIVITY_PROFILES = {
+  running: { category: "cardio", primaryRisk: "heat", idealTempRange: [12, 22] },
+  cycling: { category: "aerobic", primaryRisk: "wind", idealTempRange: [15, 25] },
+  hiking: { category: "endurance", primaryRisk: "rain", idealTempRange: [10, 24] },
+  swimming: { category: "aquatic", primaryRisk: "uv", idealTempRange: [24, 34] },
+  photography: { category: "creative", primaryRisk: "visibility", idealTempRange: [5, 28] },
+  stargazing: { category: "astronomy", primaryRisk: "clouds", idealTempRange: [5, 22] },
+  outdoor_dining: { category: "leisure", primaryRisk: "rain", idealTempRange: [18, 27] }
+};
+
 const getTrendAdjustment = (trend) => {
   if (!trend) return 0;
 
@@ -215,6 +225,7 @@ export const analyzeActivityDecision = ({
     },
 
     activity,
+    profile: ACTIVITY_PROFILES[activity.toLowerCase()] || { category: "general", primaryRisk: "overall" },
 
     suitability: {
       score: finalScore,
