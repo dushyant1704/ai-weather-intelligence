@@ -43,7 +43,8 @@ import {
   Trophy,
   CheckSquare,
   Square,
-  ArrowRight
+  ArrowRight,
+  Scale
 } from 'lucide-react';
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api').replace(/\/$/, '');
@@ -65,6 +66,7 @@ const POPULAR_MANUAL_PRESETS = [
 const SUGGESTED_QUERIES = [
   { label: '🏃 Running suitability', query: 'Should I go running today?' },
   { label: '🚴 Cycling conditions', query: 'Is it safe for cycling this afternoon?' },
+  { label: '⚖️ Conflict Arbitration Demo', query: 'Is it safe for cycling with 48 km/h wind gusts?' },
   { label: '🏊 Outdoor swimming', query: 'Is it suitable for outdoor swimming?' },
   { label: '☕ Outdoor dining', query: 'Will it rain during outdoor dining tonight?' },
   { label: '🚗 Driving safety', query: 'Are road conditions safe for driving?' },
@@ -94,18 +96,41 @@ export default function AIIntelligence({
       return '';
     }
   });
-  const [groqStatus, setGroqStatus] = useState({ configured: false, model: 'llama-3.3-70b-versatile' });
+  const [groqStatus, setGroqStatus] = useState({ configured: false, model: 'Groq Live AI' });
   const [apiKeyInput, setApiKeyInput] = useState('');
   const [showApiKeyModal, setShowApiKeyModal] = useState(false);
   const [keySavedToast, setKeySavedToast] = useState(false);
+
+  // Dynamically query active LLM model and status from backend
+  useEffect(() => {
+    let isMounted = true;
+    const fetchStatus = async () => {
+      try {
+        const headers = {};
+        if (groqApiKey) headers['x-groq-api-key'] = groqApiKey;
+        const res = await fetch(`${API_BASE}/llm/status`, { headers });
+        const data = await res.json();
+        if (isMounted && data?.success) {
+          setGroqStatus({
+            configured: Boolean(data.configured),
+            model: data.model || 'Groq Live AI'
+          });
+        }
+      } catch {
+        // silent fallback
+      }
+    };
+    fetchStatus();
+    return () => { isMounted = false; };
+  }, [groqApiKey]);
 
   // Live Copilot Chat State
   const [chatMessages, setChatMessages] = useState([
     {
       role: 'assistant',
-      content: `Hello! I'm your Live Weather AI Copilot, powered by Groq's ultra-fast LLaMA 3.3. Ask me anything about current conditions, outfit planning, best activity times, or safety recommendations!`,
+      content: `Hello! I'm your Live Weather AI Copilot, powered by Groq. Ask me anything about current conditions, outfit planning, best activity times, or safety recommendations!`,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      model: 'llama-3.3-70b-versatile',
+      model: 'Groq Live AI',
       isLive: true
     }
   ]);
@@ -346,10 +371,14 @@ export default function AIIntelligence({
 
     try {
       const params = new URLSearchParams({ query: activePrompt });
-      const lat = Number.isFinite(weatherData?.coord?.lat) ? weatherData.coord.lat : 18.5204;
-      const lon = Number.isFinite(weatherData?.coord?.lon) ? weatherData.coord.lon : 73.8567;
-      params.set('lat', String(lat));
-      params.set('lon', String(lon));
+      if (Number.isFinite(weatherData?.coord?.lat) && Number.isFinite(weatherData?.coord?.lon)) {
+        params.set('lat', String(weatherData.coord.lat));
+        params.set('lon', String(weatherData.coord.lon));
+      }
+      const cityToPass = activeCity || weatherData?.cityName;
+      if (cityToPass) {
+        params.set('city', cityToPass);
+      }
 
       const headers = {};
       if (groqApiKey) {
@@ -381,6 +410,89 @@ export default function AIIntelligence({
       }
     } catch (err) {
       setError(err?.message || 'Unable to connect to the AI weather backend. Make sure the server is running on port 5000.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // Auto-run initial analysis on mount if active location exists so the AI dashboard immediately displays multi-agent intelligence
+  const initialRunRef = useRef(false);
+  useEffect(() => {
+    if (!initialRunRef.current && (weatherData || activeCity)) {
+      initialRunRef.current = true;
+      runAnalysis(query || 'Should I go running today?');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [weatherData, activeCity]);
+
+  const handleSimulateConflict = async (activityType = 'cycling') => {
+    setBusy(true);
+    setError('');
+    try {
+      const response = await fetch(`${API_BASE}/arbitration/simulate-conflict?activity=${activityType}`);
+      const payload = await response.json();
+      if (!response.ok || payload?.success === false) {
+        throw new Error(payload?.message || 'Failed to simulate conflict.');
+      }
+      const data = payload.data;
+      setResult(prev => ({
+        ...prev,
+        query: `Should I go ${activityType} today with high crosswind gusts? (Live Multi-Agent Disagreement Simulation)`,
+        intent: 'ACTIVITY_DECISION',
+        activity: activityType,
+        executedAgents: ['data', 'risk', 'trend', 'activity', 'arbitration', 'llm'],
+        agentStatuses: {
+          data: 'completed',
+          risk: 'completed',
+          trend: 'completed',
+          activity: 'completed',
+          arbitration: 'completed',
+          city: 'skipped',
+          reasoning: 'skipped',
+          llm: 'completed'
+        },
+        arbitration: data,
+        activityDecision: {
+          activity: activityType,
+          suitability: {
+            score: data.arbitrationDecision.arbitratedScore,
+            classification: data.arbitrationDecision.arbitratedClassification
+          },
+          isArbitrated: true,
+          originalScoreBeforeArbitration: data.arbitrationDecision.initialScore,
+          decision: {
+            recommendation: data.arbitrationDecision.rationale,
+            cautionRequired: true
+          },
+          factors: {
+            positive: ['Ambient temperature within target athletic range (21°C)', 'Dry roadway surface & zero rain'],
+            negative: ['Crosswind gusts 48 km/h exceed bike stability handling threshold (38 km/h)']
+          }
+        },
+        riskResult: {
+          overallRisk: { score: 72, level: 'HIGH' },
+          activityRisk: { score: 75, level: 'HIGH' },
+          risks: {
+            wind: { score: 75, level: 'HIGH', factors: ['Severe crosswind gusts up to 48 km/h exceeding aerodynamic bike handling threshold'] },
+            rain: { score: 10, level: 'LOW', factors: [] },
+            heat: { score: 20, level: 'LOW', factors: [] },
+            uv: { score: 30, level: 'LOW', factors: [] }
+          }
+        },
+        trendResult: {
+          overallTrend: { level: 'WORSENING', score: 65, reason: 'Wind velocity accelerating over next 90 minutes' }
+        },
+        llmInsight: {
+          executiveVerdict: `[Cross-Agent Conflict Arbitrated] Activity Decision initially scored ${activityType} favorably (78/100), but Risk Intelligence objected due to 48 km/h wind gusts. The Arbiter ruled in favor of physical safety, lowering suitability to ${data.arbitrationDecision.arbitratedScore}/100 and negotiating an indoor trainer alternative.`,
+          optimalTimeWindow: data.negotiatedReplan.optimalTimeWindow,
+          gearAndClothing: data.negotiatedReplan.safeguardProtocols,
+          healthAndSafetyTips: ['Avoid open exposed roadways', 'Switch to indoor stationary session'],
+          comfortInsight: 'Extreme aerodynamic drag and sudden gust sheer present acute tipping hazards.'
+        }
+      }));
+      setActiveTab('arbitration');
+    } catch (err) {
+      setError(err?.message || 'Failed to simulate agent conflict.');
     } finally {
       setBusy(false);
     }
@@ -437,7 +549,7 @@ export default function AIIntelligence({
         role: 'assistant',
         content: data.reply || (data.message ? `Error: ${data.message}` : 'No response from AI assistant.'),
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        model: data.model || groqStatus.model || 'llama-3.3-70b-versatile',
+        model: data.model || groqStatus.model || 'Groq Live AI',
         latencyMs: data.latencyMs,
         isLive: Boolean(data.isLiveGroq)
       };
@@ -996,6 +1108,46 @@ export default function AIIntelligence({
             </div>
           </div>
 
+          {/* Cross-Agent Conflict Arbitrated Banner */}
+          {result?.arbitration?.hasConflict && (
+            <div className="ai-cross-agent-arbitration-banner">
+              <div className="arbitration-banner-top">
+                <div className="arbitration-badge">
+                  <Scale size={16} />
+                  <span>Cross-Agent Conflict Arbitrated</span>
+                </div>
+                <span className="arbitration-ruling-chip">
+                  Safety Overrule: Risk Intelligence overrode Activity Decision
+                </span>
+                <button
+                  type="button"
+                  className="arbitration-tab-jump-btn"
+                  onClick={() => setActiveTab('arbitration')}
+                >
+                  <span>View Full Arbitration & Replan</span>
+                  <ArrowRight size={14} />
+                </button>
+              </div>
+              <div className="arbitration-banner-body">
+                <div className="arbitration-clash-mini">
+                  <span className="clash-mini-tag proponent">
+                    Activity Decision: {result.arbitration.arbitrationDecision?.initialScore}/100 (Favorable)
+                  </span>
+                  <span className="clash-mini-vs">VS</span>
+                  <span className="clash-mini-tag objector">
+                    Risk Intelligence: {result.arbitration.partiesInvolved?.[1]?.claim || 'Acute Hazard Flagged'}
+                  </span>
+                </div>
+                <p className="arbitration-replan-summary">
+                  <strong>Negotiated Replan:</strong> {result.arbitration.negotiatedReplan?.optimalTimeWindow || 'Schedule adjusted for safety.'}
+                  {result.arbitration.negotiatedReplan?.recommendedSubstitutions?.[0] && (
+                    <span> • Suggested alternative: <em>{result.arbitration.negotiatedReplan.recommendedSubstitutions[0]}</em></span>
+                  )}
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* 5. Four Summary Cards */}
           <div className="ai-kpi-grid">
             {/* KPI 1: Suitability Score */}
@@ -1143,6 +1295,20 @@ export default function AIIntelligence({
               <button
                 type="button"
                 role="tab"
+                aria-selected={activeTab === 'arbitration'}
+                className={`ai-tab-btn ${activeTab === 'arbitration' ? 'active' : ''}`}
+                onClick={() => setActiveTab('arbitration')}
+              >
+                <Scale size={16} className={result?.arbitration?.hasConflict ? 'text-amber' : ''} />
+                <span>Agent Arbitration</span>
+                {result?.arbitration?.hasConflict && (
+                  <span className="tab-pill-badge" style={{ background: '#f59e0b', color: '#000', fontWeight: 800 }}>Overruled</span>
+                )}
+              </button>
+
+              <button
+                type="button"
+                role="tab"
                 aria-selected={activeTab === 'copilot'}
                 className={`ai-tab-btn ai-tab-btn-copilot ${activeTab === 'copilot' ? 'active' : ''}`}
                 onClick={() => setActiveTab('copilot')}
@@ -1178,6 +1344,166 @@ export default function AIIntelligence({
 
             {/* TAB CONTENT PANELS */}
             <div className="ai-tab-content-wrapper">
+              {/* TAB: Cross-Agent Conflict Arbitration & Dynamic Replanning */}
+              {activeTab === 'arbitration' && (
+                <div className="ai-tab-panel" role="tabpanel">
+                  <div className="ai-panel-header">
+                    <div className="ai-panel-title-row">
+                      <h3>⚖️ Cross-Agent Conflict Arbitration & Dynamic Replanning</h3>
+                      <button
+                        type="button"
+                        className="ai-simulate-conflict-btn"
+                        onClick={() => handleSimulateConflict('cycling')}
+                        disabled={busy}
+                      >
+                        <Zap size={14} />
+                        <span>Simulate Disagreement (Cycling vs 48 km/h Gusts)</span>
+                      </button>
+                    </div>
+                    <p>
+                      Autonomous meta-agent that monitors specialist agents, identifies direct contradictions (e.g., Risk Intelligence flagging an acute hazard while Activity Decision scored favorably), adjudicates using safety invariance principles, and negotiates a dynamic replan.
+                    </p>
+                  </div>
+
+                  {result?.arbitration?.hasConflict ? (
+                    <div className="ai-arbitration-full-view">
+                      {/* Status Banner */}
+                      <div className="ai-arbitration-status-banner">
+                        <div className="status-badge">
+                          <Scale size={20} />
+                          <span>DISAGREEMENT ARBITRATED: {result.arbitration.arbitrationDecision?.ruling}</span>
+                        </div>
+                        <p className="status-summary">
+                          {result.arbitration.arbitrationDecision?.rationale}
+                        </p>
+                      </div>
+
+                      {/* Head-to-Head Agent Stance Clash */}
+                      <div className="ai-agent-clash-grid">
+                        <div className="ai-agent-clash-card proponent">
+                          <div className="clash-agent-header">
+                            <span className="clash-role-badge">Agent A: Proponent</span>
+                            <h4>Activity Decision Agent</h4>
+                          </div>
+                          <div className="clash-score-display">
+                            <span className="clash-score-num text-cyan">
+                              {result.arbitration.arbitrationDecision?.initialScore ?? 78}/100
+                            </span>
+                            <span className="clash-score-label">Initial Feasibility Assessment</span>
+                          </div>
+                          <p className="clash-argument">
+                            "{result.arbitration.partiesInvolved?.[0]?.claim || 'Evaluated general weather as viable based on ambient temperatures.'}"
+                          </p>
+                        </div>
+
+                        <div className="ai-agent-clash-vs">
+                          <div className="vs-badge">VS</div>
+                        </div>
+
+                        <div className="ai-agent-clash-card objector">
+                          <div className="clash-agent-header">
+                            <span className="clash-role-badge hazard">Agent B: Objector</span>
+                            <h4>Risk Intelligence Agent</h4>
+                          </div>
+                          <div className="clash-score-display">
+                            <span className="clash-score-num text-rose">
+                              {result.arbitration.partiesInvolved?.[1]?.score ?? 75}/100 Risk
+                            </span>
+                            <span className="clash-score-label">Severe Localized Hazard Flag</span>
+                          </div>
+                          <p className="clash-argument">
+                            "{result.arbitration.partiesInvolved?.[1]?.claim || 'High wind gusts exceed handling stability threshold.'}"
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Adjudication Matrix & Scoring Derivation */}
+                      <div className="ai-adjudication-matrix-card">
+                        <h4>⚖️ Arbiter Adjudication Protocol</h4>
+                        <div className="adjudication-details-grid">
+                          <div className="adjudication-item">
+                            <span className="adj-label">Governing Principle</span>
+                            <span className="adj-value">{result.arbitration.arbitrationDecision?.governingPrinciple}</span>
+                          </div>
+                          <div className="adjudication-item">
+                            <span className="adj-label">Prevailing Finding</span>
+                            <span className="adj-value text-emerald">{result.arbitration.arbitrationDecision?.winner}</span>
+                          </div>
+                          <div className="adjudication-item">
+                            <span className="adj-label">Score Recalibration</span>
+                            <span className="adj-value">
+                              <span className="adj-old-score">{result.arbitration.arbitrationDecision?.initialScore}</span>
+                              <ArrowRight size={14} className="inline-arrow" />
+                              <span className="adj-new-score">
+                                {result.arbitration.arbitrationDecision?.arbitratedScore} ({result.arbitration.arbitrationDecision?.arbitratedClassification})
+                              </span>
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Negotiated Replanning Section */}
+                      {result.arbitration.negotiatedReplan && (
+                        <div className="ai-replan-container">
+                          <h4>🔄 Autonomous Negotiated Replan</h4>
+                          <div className="replan-grid">
+                            <div className="replan-box time-box">
+                              <div className="replan-box-header">
+                                <Clock size={16} className="text-amber" />
+                                <h5>Optimal Rescheduled Window</h5>
+                              </div>
+                              <p className="replan-window-text">
+                                {result.arbitration.negotiatedReplan.optimalTimeWindow}
+                              </p>
+                            </div>
+
+                            <div className="replan-box subst-box">
+                              <div className="replan-box-header">
+                                <RefreshCw size={16} className="text-cyan" />
+                                <h5>Negotiated Safe Substitutions</h5>
+                              </div>
+                              <ul className="replan-list">
+                                {result.arbitration.negotiatedReplan.recommendedSubstitutions?.map((sub, i) => (
+                                  <li key={i}>{sub}</li>
+                                ))}
+                              </ul>
+                            </div>
+
+                            <div className="replan-box safeguard-box">
+                              <div className="replan-box-header">
+                                <ShieldCheck size={16} className="text-emerald" />
+                                <h5>Compensatory Safety Safeguards</h5>
+                              </div>
+                              <ul className="replan-list">
+                                {result.arbitration.negotiatedReplan.safeguardProtocols?.map((sg, i) => (
+                                  <li key={i}>{sg}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="ai-consensus-box">
+                      <CheckCircle2 size={36} className="text-emerald" />
+                      <h4>Multi-Agent Consensus Verified</h4>
+                      <p>
+                        {result?.arbitration?.consensusSummary ||
+                          'All specialist agents (Risk Intelligence, Forecast Trend, and Activity Decision) are in full consensus. No conflicting hazard objections were raised.'}
+                      </p>
+                      <button
+                        type="button"
+                        className="ai-demo-trigger-btn"
+                        onClick={() => handleSimulateConflict('cycling')}
+                      >
+                        <Zap size={14} />
+                        <span>Simulate Disagreement (Cycling vs 48 km/h Gusts)</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
               {/* TAB 1: Risk Radar */}
               {activeTab === 'radar' && (
                 <div className="ai-tab-panel" role="tabpanel">

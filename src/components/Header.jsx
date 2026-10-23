@@ -117,7 +117,7 @@ const Header = ({
             <input
               type="text"
               className="header-search-input"
-              placeholder="Search city or locality (e.g. Rau, Indore, Delhi, London)..."
+              placeholder="Search any global city or address (e.g. Tokyo, Paris, New York, London)..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               onFocus={() => {

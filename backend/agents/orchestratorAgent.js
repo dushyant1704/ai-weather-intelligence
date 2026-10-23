@@ -5,6 +5,7 @@ import { analyzeForecastTrend } from "./forecastTrendAgent.js";
 import { analyzeActivityDecision } from "./activityDecisionAgent.js";
 import { analyzeCityIntelligence } from "./cityIntelligenceAgent.js";
 import { reasonAboutWeather } from "./weatherReasoningAgent.js";
+import { arbitrateAgentDisagreements } from "./conflictArbitrationAgent.js";
 import {
   searchLocations,
   getCurrentWeather,
@@ -13,23 +14,37 @@ import {
 } from "../services/openWeatherService.js";
 import { generateGroqInsight } from "../services/groqService.js";
 
-const CITY_DATABASE = {
-  pune: { name: "Pune", country: "IN", lat: 18.5204, lon: 73.8567 },
-  mumbai: { name: "Mumbai", country: "IN", lat: 19.0760, lon: 72.8777 },
-  delhi: { name: "Delhi", country: "IN", lat: 28.6139, lon: 77.2090 },
-  bangalore: { name: "Bangalore", country: "IN", lat: 12.9716, lon: 77.5946 },
-  bengaluru: { name: "Bangalore", country: "IN", lat: 12.9716, lon: 77.5946 },
-  indore: { name: "Indore", country: "IN", lat: 22.7196, lon: 75.8577 },
-  london: { name: "London", country: "GB", lat: 51.5074, lon: -0.1278 },
-  paris: { name: "Paris", country: "FR", lat: 48.8566, lon: 2.3522 },
-  tokyo: { name: "Tokyo", country: "JP", lat: 35.6762, lon: 139.6503 },
-  sydney: { name: "Sydney", country: "AU", lat: -33.8688, lon: 151.2093 },
-  berlin: { name: "Berlin", country: "DE", lat: 52.5200, lon: 13.4050 },
-  "new york": { name: "New York", country: "US", lat: 40.7128, lon: -74.0060 },
-  barcelona: { name: "Barcelona", country: "ES", lat: 41.3851, lon: 2.1734 },
-  dubai: { name: "Dubai", country: "AE", lat: 25.2048, lon: 55.2708 },
-  singapore: { name: "Singapore", country: "SG", lat: 1.3521, lon: 103.8198 },
-  rome: { name: "Rome", country: "IT", lat: 41.9028, lon: 12.4964 }
+// In-memory dynamic geocoding cache for real-time location resolution across any global city
+const GEOCODE_CACHE = new Map();
+
+/**
+ * Dynamically resolves coordinates for any city worldwide via OpenWeather Geocoding.
+ */
+export const resolveCityLocation = async (name) => {
+  if (!name || typeof name !== "string" || !name.trim()) return null;
+  const key = name.trim().toLowerCase();
+
+  if (GEOCODE_CACHE.has(key)) {
+    return GEOCODE_CACHE.get(key);
+  }
+
+  try {
+    const locations = await searchLocations(name.trim());
+    if (locations && locations.length > 0) {
+      const resolved = {
+        name: locations[0].name,
+        country: locations[0].country || "",
+        lat: locations[0].lat,
+        lon: locations[0].lon
+      };
+      GEOCODE_CACHE.set(key, resolved);
+      return resolved;
+    }
+  } catch (err) {
+    console.warn(`Dynamic geocode failed for city "${name}":`, err.message);
+  }
+
+  return null;
 };
 
 const normalizeQuery = (query = "") => {
@@ -111,46 +126,82 @@ const extractComparisonCities = (query) => {
   return [];
 };
 
-// Extract single city targeted with prepositions (e.g. "in Paris", "for Tokyo", "at London")
+// Extract single city targeted with prepositions or subject patterns (e.g. "in Paris", "weather for Tokyo", "Is Tokyo good for...")
 const extractTargetCity = (query) => {
-  const directMatch = query.match(/\b(?:in|at|near)\s+([a-zA-Z\s.-]{2,50}?)(?:\s+(?:today|tomorrow|tonight|this afternoon|this morning|right now)|[?!.,]|$)/i);
-  const match = directMatch || query.match(/\b(?:for)\s+([a-zA-Z\s.-]{2,50}?)(?:\s+(?:today|tomorrow|tonight|this afternoon|this morning|right now)|[?!.,]|$)/i);
-  if (match && match[1]) {
-    const candidate = match[1].trim();
-    const stopWords = ["running", "cycling", "swimming", "hiking", "travel", "photography", "driving", "outdoor dining", "today", "tomorrow", "tonight", "me", "us", "weather", "forecast", "risk", "comfort", "safe", "sightseeing"];
-    if (!stopWords.includes(candidate.toLowerCase())) {
-      return candidate;
-    }
+  if (!query || typeof query !== "string") return null;
+
+  const activityWords = [
+    "running", "cycling", "swimming", "hiking", "travel", "photography",
+    "outdoor photography", "driving", "outdoor dining", "dining", "sightseeing",
+    "walking", "jogging", "marathon", "picnic", "skiing", "sports", "flight",
+    "event", "outdoor event", "gardening", "sailing", "camping"
+  ];
+  const commonStopWords = [
+    "today", "tomorrow", "tonight", "this morning", "this afternoon", "right now",
+    "me", "us", "weather", "forecast", "risk", "comfort", "safe", "suitable",
+    "it", "there", "here", "good", "bad", "okay", "ok"
+  ];
+
+  const isValidCityCandidate = (cand) => {
+    if (!cand) return false;
+    const lower = cand.trim().toLowerCase();
+    if (lower.length < 2 || lower.length > 50) return false;
+    if (activityWords.some(w => lower === w || lower.startsWith(w + " ") || lower.endsWith(" " + w))) return false;
+    if (commonStopWords.includes(lower)) return false;
+    return true;
+  };
+
+  // Pattern A: "in Paris", "at London", "near Chicago", "around Miami"
+  const prepMatch = query.match(/\b(?:in|at|near|around)\s+([a-zA-Z\s.-]{2,50}?)(?:\s+(?:today|tomorrow|tonight|this afternoon|this morning|right now|for\s)|[?!.,]|$)/i);
+  if (prepMatch && prepMatch[1] && isValidCityCandidate(prepMatch[1])) {
+    return prepMatch[1].trim();
   }
+
+  // Pattern B: Subject questions: "Is Tokyo good for...", "How is Paris today?", "Will London have rain?", "Can Berlin..."
+  const subjectMatch = query.match(/\b(?:is|can|how is|how's|what is|whats|what's|will)\s+([a-zA-Z\s.-]{2,30}?)\s+(?:good|bad|safe|looking|ok|okay|suitable|fit|have|be|experience|weather|like|right now|today|tomorrow)/i);
+  if (subjectMatch && subjectMatch[1] && isValidCityCandidate(subjectMatch[1])) {
+    return subjectMatch[1].trim();
+  }
+
+  // Pattern C: Destination: "visit Tokyo", "trip to Rome", "travel to Berlin", "flying to Madrid"
+  const travelMatch = query.match(/\b(?:visit|visiting|trip to|travel to|going to|flying to)\s+([a-zA-Z\s.-]{2,30}?)(?:\s+(?:today|tomorrow|this|next|for)|[?!.,]|$)/i);
+  if (travelMatch && travelMatch[1] && isValidCityCandidate(travelMatch[1])) {
+    return travelMatch[1].trim();
+  }
+
+  // Pattern D: "weather/forecast for Tokyo" or "weather in Tokyo"
+  const weatherForMatch = query.match(/\b(?:weather|forecast|conditions?|report)\s+(?:for|in|of)\s+([a-zA-Z\s.-]{2,50}?)(?:\s+(?:today|tomorrow|tonight)|[?!.,]|$)/i);
+  if (weatherForMatch && weatherForMatch[1] && isValidCityCandidate(weatherForMatch[1])) {
+    return weatherForMatch[1].trim();
+  }
+
+  // Pattern E: "for Tokyo" (fallback, only if not an activity)
+  const forMatch = query.match(/\b(?:for)\s+([a-zA-Z\s.-]{2,50}?)(?:\s+(?:today|tomorrow|tonight|this afternoon|this morning|right now)|[?!.,]|$)/i);
+  if (forMatch && forMatch[1] && isValidCityCandidate(forMatch[1])) {
+    return forMatch[1].trim();
+  }
+
   return null;
 };
 
-// Bengaluru and Bangalore are aliases for one city.
+// Dynamically detect any queried cities from comparison patterns or target location prepositions
 const detectCities = (query) => {
-  const cityAliases = {
-    pune: ["pune"],
-    mumbai: ["mumbai"],
-    delhi: ["delhi"],
-    bangalore: ["bangalore", "bengaluru"],
-    indore: ["indore"],
-    london: ["london"],
-    paris: ["paris"],
-    tokyo: ["tokyo"],
-    new_york: ["new york", "nyc"]
-  };
-
   const detectedCities = [];
 
-  for (const [city, aliases] of Object.entries(cityAliases)) {
-    if (aliases.some(alias => containsKeyword(query, alias))) {
-      detectedCities.push(city);
+  // 1. Comparison extraction: "compare London and Paris", "Rome vs Madrid"
+  const comparisonCities = extractComparisonCities(query);
+  for (const c of comparisonCities) {
+    const key = c.trim().toLowerCase();
+    if (key && !detectedCities.includes(key)) {
+      detectedCities.push(key);
     }
   }
 
-  const comparisonCities = extractComparisonCities(query);
-  for (const c of comparisonCities) {
-    const key = c.toLowerCase();
-    if (!detectedCities.includes(key)) {
+  // 2. Preposition extraction: "in Paris", "at London", "for Tokyo", "near Chicago"
+  const targetCity = extractTargetCity(query);
+  if (targetCity) {
+    const key = targetCity.trim().toLowerCase();
+    if (key && !detectedCities.includes(key)) {
       detectedCities.push(key);
     }
   }
@@ -278,10 +329,10 @@ const detectIntent = (query) => {
 const buildExecutionPlan = (intentResult) => {
   const plans = {
     CITY_COMPARISON: [
-      "data", "risk", "trend", "activity", "city", "llm"
+      "data", "risk", "trend", "activity", "arbitration", "city", "llm"
     ],
     ACTIVITY_DECISION: [
-      "data", "risk", "trend", "activity", "llm"
+      "data", "risk", "trend", "activity", "arbitration", "llm"
     ],
     RISK_ASSESSMENT: [
       "data", "risk", "llm"
@@ -293,7 +344,7 @@ const buildExecutionPlan = (intentResult) => {
       "data", "reasoning", "llm"
     ],
     GENERAL_WEATHER: [
-      "data", "risk", "trend", "reasoning", "llm"
+      "data", "risk", "trend", "reasoning", "activity", "arbitration", "llm"
     ]
   };
 
@@ -433,33 +484,15 @@ export const buildCityAnalyses = async (cityNames, activity = "general") => {
   for (const name of cityNames) {
     if (typeof name !== "string" || !name.trim()) continue;
 
-    let lat = null;
-    let lon = null;
-    let cityName = name;
-    let countryName = "";
-
-    const key = name.trim().toLowerCase();
-
-    if (CITY_DATABASE[key]) {
-      lat = CITY_DATABASE[key].lat;
-      lon = CITY_DATABASE[key].lon;
-      cityName = CITY_DATABASE[key].name;
-      countryName = CITY_DATABASE[key].country;
-    } else {
-      try {
-        const locations = await searchLocations(name);
-        if (locations.length > 0) {
-          lat = locations[0].lat;
-          lon = locations[0].lon;
-          cityName = locations[0].name;
-          countryName = locations[0].country;
-        }
-      } catch (err) {
-        console.warn(`Failed to locate city ${name}:`, err.message);
-      }
+    const resolved = await resolveCityLocation(name);
+    if (!resolved || resolved.lat === null || resolved.lon === null) {
+      continue;
     }
 
-    if (lat === null || lon === null) continue;
+    const lat = resolved.lat;
+    const lon = resolved.lon;
+    const cityName = resolved.name;
+    const countryName = resolved.country;
 
     try {
       const [current, forecast, uv] = await Promise.all([
@@ -541,6 +574,8 @@ export const executeWeatherPlan = async ({
   activity = null,
   cityAnalyses = [],
   cities = [],
+  city = null,
+  cityName = null,
   apiKey = null
 }) => {
   const plan = orchestrateWeatherQuery({ query, latitude, longitude });
@@ -552,31 +587,25 @@ export const executeWeatherPlan = async ({
 
   // Resolve target cities and explicit city mentions
   const explicitTargetCity = extractTargetCity(query);
-  const targetCities = (Array.isArray(cities) && cities.length > 0)
-    ? cities
+  const passedCities = (Array.isArray(cities) ? [...cities] : (typeof cities === "string" ? cities.split(",").map(c => c.trim()).filter(Boolean) : []));
+  if (cityName && !passedCities.includes(cityName)) passedCities.unshift(cityName);
+  if (city && !passedCities.includes(city)) passedCities.unshift(city);
+
+  const targetCities = (passedCities.length > 0)
+    ? passedCities
     : (explicitTargetCity ? [explicitTargetCity] : (plan.cities || []));
 
-  // If a specific city was explicitly mentioned in the query, that city takes precedence over ambient/fallback coordinates
+  // If a specific city was explicitly mentioned in the query or passed directly, that city takes precedence over ambient coordinates
   const detectedQueryCities = plan.cities || [];
-  const hasExplicitCity = Boolean(explicitTargetCity || detectedQueryCities.length > 0);
-  let cityToResolve = explicitTargetCity || (targetCities.length > 0 && typeof targetCities[0] === "string" ? targetCities[0] : null);
+  const hasExplicitCity = Boolean(passedCities.length > 0 || explicitTargetCity || detectedQueryCities.length > 0);
+  let cityToResolve = (passedCities.length > 0 && typeof passedCities[0] === "string" ? passedCities[0] : null) || explicitTargetCity || (targetCities.length > 0 && typeof targetCities[0] === "string" ? targetCities[0] : null);
 
   if (hasExplicitCity || activeLat === null || activeLon === null) {
     if (cityToResolve && typeof cityToResolve === "string") {
-      const cityKey = cityToResolve.toLowerCase().trim();
-      if (CITY_DATABASE[cityKey]) {
-        activeLat = CITY_DATABASE[cityKey].lat;
-        activeLon = CITY_DATABASE[cityKey].lon;
-      } else {
-        try {
-          const locations = await searchLocations(cityToResolve);
-          if (locations.length > 0) {
-            activeLat = locations[0].lat;
-            activeLon = locations[0].lon;
-          }
-        } catch (err) {
-          console.warn(`Location search failed for city ${cityToResolve}:`, err.message);
-        }
+      const resolved = await resolveCityLocation(cityToResolve);
+      if (resolved && resolved.lat !== null && resolved.lon !== null) {
+        activeLat = resolved.lat;
+        activeLon = resolved.lon;
       }
     }
   }
@@ -693,9 +722,10 @@ export const executeWeatherPlan = async ({
     data: "completed",
     risk: "skipped",
     trend: "skipped",
-    activity: "skipped",
-    city: "skipped",
     reasoning: "skipped",
+    activity: "skipped",
+    arbitration: "skipped",
+    city: "skipped",
     llm: "skipped"
   };
   const executedAgents = ["data"];
@@ -753,7 +783,26 @@ export const executeWeatherPlan = async ({
     }
   }
 
-  // 4. Activity Decision Agent
+  // 4. Weather Reasoning Agent
+  if (executionPlan.includes("reasoning")) {
+    executedAgents.push("reasoning");
+    try {
+      results.reasoningResult = reasonAboutWeather({
+        current: preparedWeather,
+        uvIndex: preparedWeather.uvIndex
+      });
+      agentStatuses.reasoning = results.reasoningResult?.success === false ? "failed" : "completed";
+    } catch (err) {
+      agentStatuses.reasoning = "failed";
+      results.reasoningResult = {
+        agent: { name: "Weather Reasoning Agent", version: "1.0.0", status: "failed" },
+        success: false,
+        message: err.message || "Weather reasoning failed."
+      };
+    }
+  }
+
+  // 5. Activity Decision Agent
   if (executionPlan.includes("activity")) {
     executedAgents.push("activity");
     try {
@@ -782,7 +831,48 @@ export const executeWeatherPlan = async ({
     }
   }
 
-  // 5. City Intelligence Agent
+  // 6. Conflict Arbitration & Replanning Agent
+  if (executionPlan.includes("arbitration")) {
+    executedAgents.push("arbitration");
+    try {
+      results.arbitration = arbitrateAgentDisagreements({
+        activity: selectedActivity,
+        activityDecision: results.activityDecision,
+        riskResult: results.riskResult,
+        trendResult: results.trendResult,
+        reasoningResult: results.reasoningResult,
+        forecastList: forecastData?.list || [],
+        current: preparedWeather
+      });
+
+      agentStatuses.arbitration = results.arbitration?.status === "insufficient_data" ? "skipped" : "completed";
+
+      // If a cross-agent conflict was arbitrated, reconcile Activity Decision
+      if (results.arbitration?.hasConflict && results.activityDecision?.suitability) {
+        results.activityDecision.originalScoreBeforeArbitration = results.activityDecision.suitability.score;
+        results.activityDecision.suitability.score = results.arbitration.arbitrationDecision.arbitratedScore;
+        results.activityDecision.suitability.classification = results.arbitration.arbitrationDecision.arbitratedClassification;
+        results.activityDecision.isArbitrated = true;
+        results.activityDecision.arbitration = results.arbitration;
+        if (results.activityDecision.decision) {
+          results.activityDecision.decision.recommendation =
+            `[Arbitration Overrule] ${results.arbitration.arbitrationDecision.rationale} Negotiated replan: ${results.arbitration.negotiatedReplan.optimalTimeWindow}`;
+          results.activityDecision.decision.cautionRequired = true;
+        }
+      }
+    } catch (err) {
+      console.warn("Arbitration agent execution error:", err.message);
+      agentStatuses.arbitration = "failed";
+      results.arbitration = {
+        agent: { name: "Conflict Arbitration & Replanning Agent", version: "2.0.0", status: "failed" },
+        hasConflict: false,
+        status: "failed",
+        message: err.message
+      };
+    }
+  }
+
+  // 7. City Intelligence Agent
   if (executionPlan.includes("city")) {
     executedAgents.push("city");
     try {
@@ -826,26 +916,7 @@ export const executeWeatherPlan = async ({
     }
   }
 
-  // 6. Weather Reasoning Agent
-  if (executionPlan.includes("reasoning")) {
-    executedAgents.push("reasoning");
-    try {
-      results.reasoningResult = reasonAboutWeather({
-        current: preparedWeather,
-        uvIndex: preparedWeather.uvIndex
-      });
-      agentStatuses.reasoning = results.reasoningResult?.success === false ? "failed" : "completed";
-    } catch (err) {
-      agentStatuses.reasoning = "failed";
-      results.reasoningResult = {
-        agent: { name: "Weather Reasoning Agent", version: "1.0.0", status: "failed" },
-        success: false,
-        message: err.message || "Weather reasoning failed."
-      };
-    }
-  }
-
-  // 7. Live Groq LLM Intelligence Agent
+  // 8. Live Groq LLM Intelligence Agent
   if (executionPlan.includes("llm")) {
     executedAgents.push("llm");
     try {
@@ -862,7 +933,8 @@ export const executeWeatherPlan = async ({
         risks: results.riskResult,
         trends: results.trendResult,
         activityDecision: results.activityDecision,
-        reasoning: results.reasoningResult
+        reasoning: results.reasoningResult,
+        arbitration: results.arbitration
       }, apiKey);
       agentStatuses.llm = results.llmInsight?.isLiveGroq ? "completed" : "fallback";
     } catch (err) {

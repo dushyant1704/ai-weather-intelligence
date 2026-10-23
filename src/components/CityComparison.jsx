@@ -4,7 +4,7 @@ import { fetchCurrentWeather, fetchUVIndex } from '../services/weatherApi'
 import { formatTemperature, degreesToCardinal, getWeatherIcon } from '../utils/weatherUtils'
 
 const CityComparison = ({
-  defaultCities = ['Pune', 'Mumbai', 'Delhi'],
+  defaultCities = ['London', 'New York', 'Tokyo'],
   unit = 'C',
   onSelectCity
 }) => {

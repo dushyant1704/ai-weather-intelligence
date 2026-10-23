@@ -25,9 +25,13 @@ const DEFAULT_RECOMMENDATION_POOL = [
 router.get("/recommendations", async (req, res) => {
   try {
     const activity = req.query.activity || "sightseeing";
+    const customPool = req.query.cities || req.query.pool;
+    const pool = typeof customPool === "string"
+      ? customPool.split(",").map(c => c.trim()).filter(Boolean)
+      : (Array.isArray(customPool) ? customPool : DEFAULT_RECOMMENDATION_POOL);
 
     const candidateAnalyses = await buildCityAnalyses(
-      DEFAULT_RECOMMENDATION_POOL,
+      pool,
       activity
     );
 

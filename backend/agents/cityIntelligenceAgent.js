@@ -44,9 +44,8 @@ const calculateCitySuitability = (cityResult) => {
   }
 
   const score =
-    activitySuitability * 0.70 +
-    generalSuitability * 0.20 +
-    50 * 0.10 +
+    activitySuitability * 0.75 +
+    generalSuitability * 0.25 +
     trendAdjustment;
 
   return clamp(Math.round(score));

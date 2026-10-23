@@ -2,6 +2,16 @@
   "name": "ai-weather-backend",
   "version": "1.0.0",
   "description": "Backend for AI Weather Intelligence and Decision Support System",
+  "contributors": [
+    {
+      "name": "dushyant1704",
+      "url": "https://github.com/dushyant1704"
+    },
+    {
+      "name": "AVI192",
+      "url": "https://github.com/AVI192"
+    }
+  ],
   "main": "server.js",
   "type": "module",
   "scripts": {

@@ -12,6 +12,7 @@ import activityRoutes from "./routes/activityRoutes.js";
 import cityRoutes from "./routes/cityRoutes.js";
 import orchestratorRoutes from "./routes/orchestratorRoutes.js";
 import llmRoutes from "./routes/llmRoutes.js";
+import arbitrationRoutes from "./routes/arbitrationRoutes.js";
 dotenv.config();
 
 const app = express();
@@ -54,6 +55,7 @@ app.use(
 app.use("/api/city", cityRoutes);
 app.use("/api/orchestrator", orchestratorRoutes);
 app.use("/api/llm", llmRoutes);
+app.use("/api/arbitration", arbitrationRoutes);
 app.use((err, req, res, _next) => {
   console.error('Backend Error:', err);
 

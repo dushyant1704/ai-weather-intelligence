@@ -504,12 +504,12 @@ const THEME_KEY = 'weather_app_theme'
 export const getRecentSearches = () => {
   try {
     const data = localStorage.getItem(RECENT_KEY)
-    if (!data) return ['Pune', 'Mumbai', 'Delhi']
+    if (!data) return []
     const parsed = JSON.parse(data)
-    return Array.isArray(parsed) ? parsed : ['Pune', 'Mumbai', 'Delhi']
+    return Array.isArray(parsed) ? parsed : []
   } catch (err) {
     console.warn('Error reading recent searches:', err)
-    return ['Pune', 'Mumbai', 'Delhi']
+    return []
   }
 }
 
@@ -544,12 +544,12 @@ export const clearRecentSearches = () => {
 export const getFavoriteCities = () => {
   try {
     const data = localStorage.getItem(FAVORITES_KEY)
-    if (!data) return ['Pune', 'Mumbai', 'Delhi']
+    if (!data) return ['London', 'New York', 'Tokyo']
     const parsed = JSON.parse(data)
-    return Array.isArray(parsed) ? parsed : ['Pune', 'Mumbai', 'Delhi']
+    return Array.isArray(parsed) && parsed.length > 0 ? parsed : ['London', 'New York', 'Tokyo']
   } catch (err) {
     console.warn('Error reading favorite cities:', err)
-    return ['Pune', 'Mumbai', 'Delhi']
+    return ['London', 'New York', 'Tokyo']
   }
 }
 

@@ -1,7 +1,17 @@
 {
   "name": "weather-app",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
+  "contributors": [
+    {
+      "name": "dushyant1704",
+      "url": "https://github.com/dushyant1704"
+    },
+    {
+      "name": "AVI192",
+      "url": "https://github.com/AVI192"
+    }
+  ],
   "type": "module",
   "scripts": {
     "dev": "vite",

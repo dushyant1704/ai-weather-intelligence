@@ -167,3 +167,27 @@ Open the printed Vite URL in your browser (typically `http://localhost:5173`).
 ## 🛡️ Security Best Practices
 - Never commit `.env` files with secret API keys. Keep all keys server-side in `backend/.env`.
 - Frontend code only interacts through the proxy backend server or exposed non-secret Vite variables.
+
+---
+
+## 👥 Contributors
+
+<div align="center">
+  <table>
+    <tr>
+      <td align="center">
+        <a href="https://github.com/dushyant1704">
+          <img src="https://github.com/dushyant1704.png?size=100" width="100px" style="border-radius:50%;" alt="Dushyant"/><br />
+          <sub><b>@dushyant1704</b></sub>
+        </a>
+      </td>
+      <td align="center">
+        <a href="https://github.com/AVI192">
+          <img src="https://github.com/AVI192.png?size=100" width="100px" style="border-radius:50%;" alt="AVI192"/><br />
+          <sub><b>@AVI192</b></sub>
+        </a>
+      </td>
+    </tr>
+  </table>
+</div>
+

@@ -65,6 +65,9 @@ const handleExecute = async (req, res) => {
       query = "",
       lat,
       lon,
+      city,
+      cityName,
+      location,
       current,
       forecast,
       uvData,
@@ -73,11 +76,12 @@ const handleExecute = async (req, res) => {
       cities
     } = params;
 
-    const parsedLat = Number(lat);
-    const parsedLon = Number(lon);
+    const parsedLat = Number(lat ?? (typeof location === 'object' ? location?.lat ?? location?.latitude : null));
+    const parsedLon = Number(lon ?? (typeof location === 'object' ? location?.lon ?? location?.longitude : null));
 
     const latitude = Number.isFinite(parsedLat) ? parsedLat : null;
     const longitude = Number.isFinite(parsedLon) ? parsedLon : null;
+    const resolvedCity = cityName || city || (typeof location === 'string' ? location : location?.city || location?.cityName || null);
 
     const headerKey = req.headers['x-groq-api-key'];
     const activeApiKey = params.apiKey || headerKey || null;
@@ -86,6 +90,8 @@ const handleExecute = async (req, res) => {
       query,
       latitude,
       longitude,
+      city: resolvedCity,
+      cityName: resolvedCity,
       current,
       forecast,
       uvData,

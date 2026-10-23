@@ -21,7 +21,7 @@ const ErrorState = ({ message, onRetry, onSearchDefault }) => {
         )}
         {onSearchDefault && (
           <button className="error-action-btn default-btn" onClick={onSearchDefault}>
-            <Search size={16} /> Load Pune
+            <Search size={16} /> Load Default Location
           </button>
         )}
       </div>

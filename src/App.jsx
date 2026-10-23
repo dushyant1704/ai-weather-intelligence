@@ -191,10 +191,37 @@ const App = () => {
     setRecentSearches([])
   }
 
-  // Initial Load - Defaults to Pune, Maharashtra, India
+  // Initial Load - Restores previous search history, favorite city, or geolocation
   useEffect(() => {
-    handleSearch('Pune')
-  }, [handleSearch])
+    const recent = getRecentSearches();
+    if (recent && recent.length > 0 && recent[0]) {
+      handleSearch(recent[0]);
+      return;
+    }
+
+    const favs = getFavoriteCities();
+    if (favs && favs.length > 0 && favs[0]) {
+      handleSearch(favs[0]);
+      return;
+    }
+
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          handleSearch({
+            lat: pos.coords.latitude,
+            lon: pos.coords.longitude
+          });
+        },
+        () => {
+          handleSearch('London');
+        },
+        { timeout: 5000 }
+      );
+    } else {
+      handleSearch('London');
+    }
+  }, [handleSearch]);
 
   // Compute theme modifier classes
   const weatherConditionClass = currentWeather
@@ -258,8 +285,8 @@ const App = () => {
             ) : errorMessage ? (
               <ErrorState
                 message={errorMessage}
-                onRetry={() => handleSearch(activeCity || 'Pune')}
-                onSearchDefault={() => handleSearch('Pune')}
+                onRetry={() => handleSearch(activeCity || (recentSearches && recentSearches[0]) || 'London')}
+                onSearchDefault={() => handleSearch((recentSearches && recentSearches[0]) || 'London')}
               />
             ) : currentWeather ? (
               <>
@@ -422,7 +449,17 @@ const App = () => {
           </main>
 
           <footer className="app-footer">
-            <p>WeatherPulse Dashboard • Powered by OpenWeatherMap & OpenMeteo API</p>
+            <p>
+              WeatherPulse AI Dashboard • Created by{' '}
+              <a href="https://github.com/dushyant1704" target="_blank" rel="noreferrer" style={{ color: 'var(--color-primary-400, #38bdf8)', textDecoration: 'none', fontWeight: 600 }}>
+                @dushyant1704
+              </a>{' '}
+              &amp;{' '}
+              <a href="https://github.com/AVI192" target="_blank" rel="noreferrer" style={{ color: 'var(--color-primary-400, #38bdf8)', textDecoration: 'none', fontWeight: 600 }}>
+                @AVI192
+              </a>{' '}
+              • Powered by Groq AI &amp; OpenWeatherMap
+            </p>
           </footer>
         </div>
       </div>

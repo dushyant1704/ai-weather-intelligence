@@ -36,7 +36,8 @@ export const generateGroqInsight = async ({
   risks = null,
   trends = null,
   activityDecision = null,
-  reasoning = null
+  reasoning = null,
+  arbitration = null
 }, apiKeyOverride = null) => {
   const client = getGroqClient(apiKeyOverride);
 
@@ -49,7 +50,8 @@ export const generateGroqInsight = async ({
       risks,
       trends,
       activityDecision,
-      reasoning
+      reasoning,
+      arbitration
     });
   }
 
@@ -79,7 +81,19 @@ export const generateGroqInsight = async ({
     suitabilityScore: activityDecision?.suitability?.score ?? null,
     favorableFactors: activityDecision?.factors?.positive || [],
     cautionFactors: activityDecision?.factors?.negative || [],
-    thermalComfort: reasoning?.thermalComfort?.comfortLevel || 'MODERATE'
+    thermalComfort: reasoning?.thermalComfort?.comfortLevel || 'MODERATE',
+    crossAgentArbitration: arbitration?.hasConflict ? {
+      conflictDetected: true,
+      opposingAgent: arbitration.partiesInvolved?.[1]?.agent || 'Risk Intelligence Agent',
+      favoredAgent: arbitration.partiesInvolved?.[0]?.agent || 'Activity Decision Agent',
+      ruling: arbitration.arbitrationDecision?.ruling,
+      governingPrinciple: arbitration.arbitrationDecision?.governingPrinciple,
+      initialScore: arbitration.arbitrationDecision?.initialScore,
+      arbitratedScore: arbitration.arbitrationDecision?.arbitratedScore,
+      arbitratedClassification: arbitration.arbitrationDecision?.arbitratedClassification,
+      rationale: arbitration.arbitrationDecision?.rationale,
+      negotiatedReplan: arbitration.negotiatedReplan
+    } : { conflictDetected: false, consensus: 'All agents in agreement' }
   };
 
   const systemPrompt = `You are WeatherPulse Live AI, an autonomous meteorological intelligence and decision support agent powered by Groq.
@@ -88,12 +102,13 @@ Your task is to analyze real-time atmospheric sensor data and multi-agent risk c
 Strict Guidelines:
 1. Ground your analysis firmly in the provided telemetry (temperatures, risks, UV, trend direction, humidity).
 2. Answer the user's specific query directly and decisively.
-3. Be concise, engaging, and professional.
-4. Output MUST be valid, well-formed JSON matching the required schema exactly. Do NOT wrap in markdown code blocks or backticks.
+3. If crossAgentArbitration indicates a conflict was arbitrated (conflictDetected: true, e.g. Risk Intelligence overrules Activity Decision due to acute hazards), explicitly highlight this arbitration in your executiveVerdict and feature the negotiated replanned alternative.
+4. Be concise, engaging, and professional.
+5. Output MUST be valid, well-formed JSON matching the required schema exactly. Do NOT wrap in markdown code blocks or backticks.
 
 Output JSON Schema:
 {
-  "executiveVerdict": "Clear 1-2 sentence verdict directly answering the query with rationale",
+  "executiveVerdict": "Clear 1-2 sentence verdict directly answering the query with rationale, noting any cross-agent arbitration if applicable",
   "optimalTimeWindow": "Specific advised hours today (e.g. '06:30 - 09:00 AM before heat & UV spike' or 'After 17:00 as temperatures cool')",
   "gearAndClothing": ["Specific recommended clothing or equipment 1", "Item 2", "Item 3"],
   "healthAndSafetyTips": ["Actionable physical health or hydration precaution 1", "Precaution 2"],
@@ -290,7 +305,8 @@ function generateLocalFallbackInsight({
   risks,
   trends,
   activityDecision,
-  reasoning
+  reasoning,
+  arbitration = null
 }) {
   const city = location?.cityName || current?.cityName || 'your location';
   const temp = Math.round(current?.temperatureCelsius ?? current?.temperature ?? 24);
@@ -321,13 +337,26 @@ function generateLocalFallbackInsight({
   if (trend === 'WORSENING') timeWindow = 'Immediate window: Next 2 hours before conditions worsen';
   else if (trend === 'IMPROVING') timeWindow = 'Later afternoon / early evening as conditions improve';
 
+  let executiveVerdict = activityDecision?.decision?.recommendation || `Conditions in ${city} are currently ${condition.toLowerCase()} at ${temp}°C, rated ${suitability} for outdoor activities with ${riskLevel.toLowerCase()} environmental risk.`;
+
+  // If a cross-agent conflict was arbitrated, state the ruling and replan explicitly
+  if (arbitration?.hasConflict) {
+    const ruling = arbitration.arbitrationDecision;
+    const replan = arbitration.negotiatedReplan;
+    executiveVerdict = `[Arbitration Overrule] ${ruling?.winner} overrode initial activity optimism: ${ruling?.rationale} Negotiated replan: ${replan?.optimalTimeWindow || 'Reschedule activity'}.`;
+    if (replan?.optimalTimeWindow) timeWindow = replan.optimalTimeWindow;
+    if (replan?.recommendedSubstitutions?.length) {
+      tips.unshift(`Alternative activity negotiated: ${replan.recommendedSubstitutions[0]}`);
+    }
+  }
+
   return {
     success: true,
     isLiveGroq: false,
     provider: 'Rule Synthesizer (Add GROQ_API_KEY for Live Groq LLaMA 3.3)',
     model: 'synthesizer-heuristic-v1',
     latencyMs: 1,
-    executiveVerdict: activityDecision?.decision?.recommendation || `Conditions in ${city} are currently ${condition.toLowerCase()} at ${temp}°C, rated ${suitability} for outdoor activities with ${riskLevel.toLowerCase()} environmental risk.`,
+    executiveVerdict,
     optimalTimeWindow: timeWindow,
     gearAndClothing: clothes,
     healthAndSafetyTips: tips,
