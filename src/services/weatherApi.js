@@ -1,6 +1,7 @@
 import { deduplicateLocations } from '../utils/weatherUtils'
 
-const API_BASE_URL = 'http://localhost:5000/api/weather'
+const API_BASE = (import.meta.env.VITE_API_BASE_URL || '/api').replace(/\/$/, '')
+const API_BASE_URL = `${API_BASE}/weather`
 
 // In-memory cache for API calls with 5-minute TTL
 const apiCache = new Map()

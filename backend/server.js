@@ -21,11 +21,7 @@ const PORT = Number(process.env.PORT) || 5000;
 const FRONTEND_URL =
   process.env.FRONTEND_URL || 'http://localhost:5173';
 
-app.use(
-  cors({
-    origin: FRONTEND_URL
-  })
-);
+app.use(cors());
 
 app.use(express.json());
 
@@ -65,8 +61,12 @@ app.use((err, req, res, _next) => {
   });
 });
 
-app.listen(PORT, () => {
-  console.log(
-    `AI Weather backend running at http://localhost:${PORT}`
-  );
-});
+if (!process.env.VERCEL) {
+  app.listen(PORT, () => {
+    console.log(
+      `AI Weather backend running at http://localhost:${PORT}`
+    );
+  });
+}
+
+export default app;
