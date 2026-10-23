@@ -163,8 +163,28 @@ export const deduplicateLocations = (results = []) => {
  * @param {boolean} includeSeconds - Whether to include seconds in output
  * @returns {string} e.g. "11:18:33 PM" or "11:18 PM"
  */
-export const formatCityLocalTime = (input, timezoneOffsetSeconds = 0, includeSeconds = false) => {
+export const formatTimezoneLabel = (offsetSeconds) => {
+  const effectiveOffset = typeof offsetSeconds === 'number'
+    ? offsetSeconds
+    : -new Date().getTimezoneOffset() * 60
+
+  if (effectiveOffset === 19800) return 'IST'
+  const hours = effectiveOffset / 3600
+  const sign = hours >= 0 ? '+' : '-'
+  const absHours = Math.floor(Math.abs(hours))
+  const mins = Math.abs(effectiveOffset % 3600) / 60
+  const minsStr = mins > 0 ? `:${mins.toString().padStart(2, '0')}` : ''
+  return `UTC${sign}${absHours}${minsStr}`
+}
+
+export const formatCityLocalTime = (input, timezoneOffsetSeconds = null, includeSeconds = false) => {
   if (!input) return '--:--'
+
+  // Default to user's device local timezone if timezoneOffsetSeconds is not explicitly provided
+  const offset = typeof timezoneOffsetSeconds === 'number'
+    ? timezoneOffsetSeconds
+    : -new Date().getTimezoneOffset() * 60
+
   let utcMs = 0
   if (input instanceof Date) {
     utcMs = input.getTime()
@@ -174,7 +194,7 @@ export const formatCityLocalTime = (input, timezoneOffsetSeconds = 0, includeSec
     return '--:--'
   }
 
-  const cityLocalMs = utcMs + (timezoneOffsetSeconds * 1000)
+  const cityLocalMs = utcMs + (offset * 1000)
   const targetDate = new Date(cityLocalMs)
 
   return targetDate.toLocaleTimeString('en-US', {
@@ -188,10 +208,14 @@ export const formatCityLocalTime = (input, timezoneOffsetSeconds = 0, includeSec
 /**
  * Centralized helper to format full date in the target city's local timezone.
  * @param {Date|number} input - Date object or Epoch seconds timestamp
- * @param {number} timezoneOffsetSeconds - City timezone offset in seconds from UTC
+ * @param {number|null} timezoneOffsetSeconds - City timezone offset in seconds from UTC
  * @returns {string} e.g. "Monday, October 5, 2026"
  */
-export const formatCityLocalDate = (input = new Date(), timezoneOffsetSeconds = 0) => {
+export const formatCityLocalDate = (input = new Date(), timezoneOffsetSeconds = null) => {
+  const offset = typeof timezoneOffsetSeconds === 'number'
+    ? timezoneOffsetSeconds
+    : -new Date().getTimezoneOffset() * 60
+
   let utcMs = 0
   if (input instanceof Date) {
     utcMs = input.getTime()
@@ -201,7 +225,7 @@ export const formatCityLocalDate = (input = new Date(), timezoneOffsetSeconds = 
     utcMs = Date.now()
   }
 
-  const cityLocalMs = utcMs + (timezoneOffsetSeconds * 1000)
+  const cityLocalMs = utcMs + (offset * 1000)
   const targetDate = new Date(cityLocalMs)
 
   return targetDate.toLocaleDateString('en-US', {
@@ -216,20 +240,20 @@ export const formatCityLocalDate = (input = new Date(), timezoneOffsetSeconds = 
 /**
  * Formats Unix timestamp to AM/PM time representation.
  * @param {number} timestamp - Epoch seconds
- * @param {number} timezoneOffsetSeconds - OWM timezone offset in seconds
+ * @param {number|null} timezoneOffsetSeconds - OWM timezone offset in seconds
  * @returns {string}
  */
-export const formatTime = (timestamp, timezoneOffsetSeconds = 0) => {
+export const formatTime = (timestamp, timezoneOffsetSeconds = null) => {
   return formatCityLocalTime(timestamp, timezoneOffsetSeconds, false)
 }
 
 /**
  * Formats date object to full readable string in location timezone.
  * @param {Date|number} date 
- * @param {number} timezoneOffsetSeconds
+ * @param {number|null} timezoneOffsetSeconds
  * @returns {string}
  */
-export const formatFullDate = (date = new Date(), timezoneOffsetSeconds = 0) => {
+export const formatFullDate = (date = new Date(), timezoneOffsetSeconds = null) => {
   return formatCityLocalDate(date, timezoneOffsetSeconds)
 }
 

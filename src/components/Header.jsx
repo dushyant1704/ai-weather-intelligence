@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { MapPin, Sun, Moon, Search, X, Loader2, Calendar } from 'lucide-react'
 import searchIconAsset from '../assets/search.png'
-import { formatCityLocalTime, formatCityLocalDate } from '../utils/weatherUtils'
+import { formatCityLocalTime, formatCityLocalDate, formatTimezoneLabel } from '../utils/weatherUtils'
 import { searchLocations } from '../services/weatherApi'
 
 const Header = ({
@@ -90,9 +90,14 @@ const Header = ({
     setShowDropdown(false)
   }
 
-  // Centralized time and date formatting for active city's timezone
-  const formattedTimeString = formatCityLocalTime(currentTime, timezoneOffset || 0, true)
-  const formattedDateString = formatCityLocalDate(currentTime, timezoneOffset || 0)
+  // Centralized time and date formatting for active city's timezone (or local Indian timezone by default)
+  const effectiveOffset = typeof timezoneOffset === 'number'
+    ? timezoneOffset
+    : -new Date().getTimezoneOffset() * 60
+
+  const formattedTimeString = formatCityLocalTime(currentTime, effectiveOffset, true)
+  const formattedDateString = formatCityLocalDate(currentTime, effectiveOffset)
+  const timezoneTag = formatTimezoneLabel(effectiveOffset)
 
   return (
     <header className="app-header">
@@ -102,6 +107,7 @@ const Header = ({
           <Calendar size={15} className="date-icon" />
           <span>{formattedDateString}</span>
           <span className="live-clock">{formattedTimeString}</span>
+          <span className="timezone-tag">{timezoneTag}</span>
         </div>
       </div>
 

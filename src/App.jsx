@@ -205,6 +205,9 @@ const App = () => {
       return;
     }
 
+    // Default to New Delhi (India) so Indian users get local Indian weather & IST time
+    const defaultCity = 'New Delhi';
+
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (pos) => {
@@ -214,12 +217,12 @@ const App = () => {
           });
         },
         () => {
-          handleSearch('London');
+          handleSearch(defaultCity);
         },
         { timeout: 5000 }
       );
     } else {
-      handleSearch('London');
+      handleSearch(defaultCity);
     }
   }, [handleSearch]);
 
