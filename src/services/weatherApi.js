@@ -1,6 +1,24 @@
 import { deduplicateLocations } from '../utils/weatherUtils'
 
-const API_BASE = (import.meta.env.VITE_API_BASE_URL || '/api').replace(/\/$/, '')
+export const getApiBase = () => {
+  if (
+    typeof window !== 'undefined' &&
+    window.location.hostname !== 'localhost' &&
+    window.location.hostname !== '127.0.0.1' &&
+    window.location.hostname !== ''
+  ) {
+    return '/api'
+  }
+
+  const envUrl = import.meta.env.VITE_API_BASE_URL
+  if (!envUrl || envUrl.includes('localhost') || envUrl.includes('127.0.0.1')) {
+    return '/api'
+  }
+
+  return envUrl.replace(/\/$/, '')
+}
+
+const API_BASE = getApiBase()
 const API_BASE_URL = `${API_BASE}/weather`
 
 // In-memory cache for API calls with 5-minute TTL
@@ -83,7 +101,7 @@ const handleNetworkError = (error) => {
     error?.message?.includes('fetch')
   ) {
     throw new Error(
-      'Network Error: Unable to reach the weather backend. Make sure the backend is running on port 5000.'
+      'Unable to connect to weather backend. Please check your network connection or try again.'
     )
   }
 

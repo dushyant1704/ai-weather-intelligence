@@ -7,7 +7,7 @@ import drizzle_icon from '../assets/drizzle.png'
 import humidity_icon from '../assets/humidity.png'
 import rain_icon from '../assets/rain.png'
 import snow_icon from '../assets/snow.png'
-import wind_icon from '../assets/wind.png'
+import { getApiBase } from '../services/weatherApi'
 
 const ALL_ICONS = {
   "01d": clear_icon,
@@ -37,7 +37,7 @@ const Weather = () => {
     }
 
     try {
-      const apiBase = (import.meta.env.VITE_API_BASE_URL || '/api').replace(/\/$/, '')
+      const apiBase = getApiBase()
       const response = await fetch(`${apiBase}/weather/current?city=${encodeURIComponent(city)}`)
       const result = await response.json()
 
