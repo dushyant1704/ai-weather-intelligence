@@ -47,7 +47,7 @@ import {
   Scale
 } from 'lucide-react';
 
-const API_BASE = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api').replace(/\/$/, '');
+const API_BASE = (import.meta.env.VITE_API_BASE_URL || '/api').replace(/\/$/, '');
 
 const COMPARISON_ACTIVITIES = [
   { id: 'sightseeing', label: 'Sightseeing', icon: '📸' },
@@ -409,7 +409,7 @@ export default function AIIntelligence({
         setActiveTab('audit');
       }
     } catch (err) {
-      setError(err?.message || 'Unable to connect to the AI weather backend. Make sure the server is running on port 5000.');
+      setError(err?.message || 'Unable to connect to the AI weather intelligence service. Please try again.');
     } finally {
       setBusy(false);
     }
