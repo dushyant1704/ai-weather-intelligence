@@ -288,8 +288,8 @@ const App = () => {
             ) : errorMessage ? (
               <ErrorState
                 message={errorMessage}
-                onRetry={() => handleSearch(activeCity || (recentSearches && recentSearches[0]) || 'London')}
-                onSearchDefault={() => handleSearch((recentSearches && recentSearches[0]) || 'London')}
+                onRetry={() => handleSearch(activeCity || (recentSearches && recentSearches[0]) || 'New Delhi')}
+                onSearchDefault={() => handleSearch('New Delhi')}
               />
             ) : currentWeather ? (
               <>
