@@ -10,18 +10,23 @@ import {
 
 const router = Router();
 
-const getCoordinates = (req) => {
+const getCoordinates = async (req) => {
   const lat = Number(req.query.lat);
   const lon = Number(req.query.lon);
 
-  if (
-    !Number.isFinite(lat) ||
-    !Number.isFinite(lon)
-  ) {
-    throw new Error('Valid lat and lon query parameters are required.');
+  if (Number.isFinite(lat) && Number.isFinite(lon)) {
+    return { lat, lon };
   }
 
-  return { lat, lon };
+  const city = req.query.city || req.query.q;
+  if (city && typeof city === 'string' && city.trim()) {
+    const locations = await searchLocations(city.trim());
+    if (locations && locations.length > 0) {
+      return { lat: locations[0].lat, lon: locations[0].lon, name: locations[0].name };
+    }
+  }
+
+  throw new Error('Valid lat and lon or city query parameters are required.');
 };
 
 router.get('/search', async (req, res) => {
@@ -46,7 +51,7 @@ router.get('/search', async (req, res) => {
 
 router.get('/reverse', async (req, res) => {
   try {
-    const { lat, lon } = getCoordinates(req);
+    const { lat, lon } = await getCoordinates(req);
 
     const location = await reverseGeocode(lat, lon);
 
@@ -66,7 +71,7 @@ router.get('/reverse', async (req, res) => {
 
 router.get('/current', async (req, res) => {
   try {
-    const { lat, lon } = getCoordinates(req);
+    const { lat, lon } = await getCoordinates(req);
 
     const weather = await getCurrentWeather(lat, lon);
 
@@ -86,7 +91,7 @@ router.get('/current', async (req, res) => {
 
 router.get('/forecast', async (req, res) => {
   try {
-    const { lat, lon } = getCoordinates(req);
+    const { lat, lon } = await getCoordinates(req);
 
     const forecast = await getForecast(lat, lon);
 
@@ -106,7 +111,7 @@ router.get('/forecast', async (req, res) => {
 
 router.get('/uv', async (req, res) => {
   try {
-    const { lat, lon } = getCoordinates(req);
+    const { lat, lon } = await getCoordinates(req);
 
     const uv = await getUVIndex(lat, lon);
 

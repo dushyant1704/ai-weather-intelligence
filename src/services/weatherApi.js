@@ -154,15 +154,45 @@ export const geocodeCity = async (cityName) => {
     throw new Error('Please enter a city name')
   }
 
-  const candidates = await searchLocations(cityName)
+  const trimmed = cityName.trim()
+  let candidates = []
 
-  if (!candidates || candidates.length === 0) {
-    throw new Error(
-      `City "${cityName}" not found. Please check spelling.`
-    )
+  try {
+    candidates = await searchLocations(trimmed)
+  } catch (err) {
+    console.warn('searchLocations error:', err)
   }
 
-  return candidates[0]
+  if (candidates && candidates.length > 0) {
+    return candidates[0]
+  }
+
+  // Client-side fallback to free Open-Meteo Geocoding API if backend search returned empty
+  try {
+    const fallbackRes = await fetch(
+      `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(trimmed)}&count=5&language=en&format=json`
+    )
+    if (fallbackRes.ok) {
+      const fallbackData = await fallbackRes.json()
+      if (Array.isArray(fallbackData?.results) && fallbackData.results.length > 0) {
+        const top = fallbackData.results[0]
+        return {
+          name: top.name,
+          state: top.admin1 || '',
+          country: top.country_code || top.country || '',
+          lat: top.latitude,
+          lon: top.longitude,
+          displayName: [top.name, top.admin1, top.country_code || top.country].filter(Boolean).join(', ')
+        }
+      }
+    }
+  } catch (fallbackErr) {
+    console.warn('Client fallback geocode error:', fallbackErr)
+  }
+
+  throw new Error(
+    `City "${cityName}" not found. Please check spelling.`
+  )
 }
 
 /**

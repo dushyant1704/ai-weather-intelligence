@@ -107,36 +107,65 @@ export const searchLocations = async (query) => {
   const cached = getCached(cacheKey);
   if (cached) return cached;
 
-  const apiKey = getApiKey();
-  const url =
-    `${OPENWEATHER_GEO_URL}/direct` +
-    `?q=${encodeURIComponent(trimmedQuery)}` +
-    `&limit=8` +
-    `&appid=${apiKey}`;
+  let results = [];
 
-  const response = await fetchWithRetry(url);
-  const data = await handleResponse(response);
+  try {
+    const apiKey = getApiKey();
+    const url =
+      `${OPENWEATHER_GEO_URL}/direct` +
+      `?q=${encodeURIComponent(trimmedQuery)}` +
+      `&limit=8` +
+      `&appid=${apiKey}`;
 
-  if (!Array.isArray(data)) {
-    return [];
+    const response = await fetchWithRetry(url);
+    const data = await handleResponse(response);
+
+    if (Array.isArray(data) && data.length > 0) {
+      results = data.map((item) => ({
+        name: item.name || '',
+        state: item.state || '',
+        country: item.country || '',
+        lat: item.lat,
+        lon: item.lon,
+        displayName: [
+          item.name,
+          item.state,
+          item.country
+        ]
+          .filter(Boolean)
+          .join(', ')
+      }));
+    }
+  } catch (geoErr) {
+    console.warn('OpenWeather direct geocode warning:', geoErr.message);
   }
 
-  const results = data.map((item) => ({
-    name: item.name || '',
-    state: item.state || '',
-    country: item.country || '',
-    lat: item.lat,
-    lon: item.lon,
-    displayName: [
-      item.name,
-      item.state,
-      item.country
-    ]
-      .filter(Boolean)
-      .join(', ')
-  }));
+  // Fallback: If OpenWeather direct geocoding returned no results, try Open-Meteo Geocoding
+  if (!results || results.length === 0) {
+    try {
+      const omUrl = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(trimmedQuery)}&count=8&language=en&format=json`;
+      const omRes = await fetchWithRetry(omUrl);
+      if (omRes.ok) {
+        const omData = await omRes.json();
+        if (Array.isArray(omData?.results) && omData.results.length > 0) {
+          results = omData.results.map((item) => ({
+            name: item.name || '',
+            state: item.admin1 || '',
+            country: item.country_code || item.country || '',
+            lat: item.latitude,
+            lon: item.longitude,
+            displayName: [item.name, item.admin1, item.country_code || item.country].filter(Boolean).join(', ')
+          }));
+        }
+      }
+    } catch (omErr) {
+      console.warn('Open-Meteo geocoding fallback warning:', omErr.message);
+    }
+  }
 
-  setCached(cacheKey, results);
+  if (results.length > 0) {
+    setCached(cacheKey, results);
+  }
   return results;
 };
 
