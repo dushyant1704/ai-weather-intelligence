@@ -18,76 +18,94 @@ Traditional weather apps only display isolated statistics—temperatures, percen
 ## ⚙️ How It Works (System Architecture & Workflow)
 
 ```
-       ┌────────────────────────────────────────────────────────┐
-       │             User Query / Activity Question              │
-       └───────────────────────────┬────────────────────────────┘
-                                   │
-                                   ▼
-       ┌────────────────────────────────────────────────────────┐
-       │              AI Weather Orchestrator Agent             │
-       │  • Natural language intent recognition                 │
-       │  • Activity & entity extraction                        │
-       │  • Dynamic execution plan generation                   │
-       └───────────────────────────┬────────────────────────────┘
-                                   │
-                                   ▼
-       ┌────────────────────────────────────────────────────────┐
-       │           1. Data Intelligence Agent (Quality Gate)     │
-       │  • Validates live OpenWeather sensor inputs            │
-       │  • Checks completeness & telemetry integrity           │
-       └───────────────────────────┬────────────────────────────┘
-                                   │ Passed (>80% Quality Gate)
-        ┌──────────────────────────┼──────────────────────────┐
-        ▼                          ▼                          ▼
-┌──────────────────┐     ┌───────────────────┐     ┌─────────────────────┐
-│ 2. Risk Agent    │     │ 3. Trend Agent    │     │ 4. Reasoning Agent  │
-│ • Heat / Thermal │     │ • 40-step horizon │     │ • Bio-comfort model │
-│ • UV Radiation   │     │ • Trend deltas    │     │ • Atmospheric       │
-│ • Rain & Wind    │     │ • Trajectory      │     │   observations      │
-│ • Visibility     │     │   (Worsening /    │     └─────────────────────┘
-│ • Cross-effects  │     │    Improving)     │
-└────────┬─────────┘     └─────────┬─────────┘
-         │                         │
-         └────────────┬────────────┘
-                      ▼
-       ┌────────────────────────────────────────────────────────┐
-       │              5. Activity Decision Agent                │
-       │  • Calculates Suitability Score (0–100)                │
-       │  • Adjusts for forward forecast trajectory             │
-       │  • Generates Favorable vs. Caution factor breakdown    │
-       │  • Produces clear Natural-Language Recommendation      │
-       └───────────────────────────┬────────────────────────────┘
-                                   │
-                                   ▼
-       ┌────────────────────────────────────────────────────────┐
-       │           Executive Frontend Results Dashboard         │
-       │  • Hero Verdict Card & One-Click Copy                  │
-       │  • 4 KPI Metric Cards (Suitability, Risk, Trend, Data) │
-       │  • Categorized Tabs: Risk Radar, Shifts, Comfort, JSON │
-       └────────────────────────────────────────────────────────┘
+       ┌─────────────────────────────────────────────────────────────────────────────┐
+       │                 User Query / Activity Question / Multi-City                 │
+       └──────────────────────────────────────┬──────────────────────────────────────┘
+                                              │
+                                              ▼
+       ┌─────────────────────────────────────────────────────────────────────────────┐
+       │                        AI Weather Orchestrator Agent                        │
+       │  • Natural language intent recognition & entity extraction                  │
+       │  • Dynamic multi-agent execution plan generation                            │
+       └──────────────────────────────────────┬──────────────────────────────────────┘
+                                              │
+                                              ▼
+       ┌─────────────────────────────────────────────────────────────────────────────┐
+       │                   1. Data Intelligence Agent (Quality Gate)                 │
+       │  • Validates live OpenWeather sensor inputs & telemetry integrity           │
+       │  • Checks completeness & value ranges (>80% Quality Gate)                   │
+       └──────────────────────────────────────┬──────────────────────────────────────┘
+                                              │ Passed (>80%)
+        ┌─────────────────────────────────────┼─────────────────────────────────────┐
+        ▼                                     ▼                                     ▼
+ ┌───────────────────────┐             ┌───────────────────────┐             ┌───────────────────────┐
+ │ 2. Risk Agent         │             │ 3. Trend Agent        │             │ 4. Reasoning Agent    │
+ │ • 5-Hazard Risk Model │             │ • 40-step horizon     │             │ • Bio-comfort model   │
+ │ • Heat / UV / Wind    │             │ • Regression deltas   │             │ • Humidex & Chill     │
+ │ • Compound cross-risk │             │ • Worsening/Improving │             │ • Sensory impressions │
+ └───────────┬───────────┘             └───────────┬───────────┘             └───────────┬───────────┘
+             │                                     │                                     │
+             └─────────────────────────────────────┼─────────────────────────────────────┘
+                                                   ▼
+       ┌─────────────────────────────────────────────────────────────────────────────┐
+       │                         5. Activity Decision Agent                          │
+       │  • Calculates Suitability Score (0–100)                                     │
+       │  • Adjusts for forward forecast trajectory                                  │
+       │  • Compiles favorable green flags & cautionary watch points                 │
+       └──────────────────────────────────────┬──────────────────────────────────────┘
+                                              │
+                                              ▼
+       ┌─────────────────────────────────────────────────────────────────────────────┐
+       │                  6. Conflict Arbitration & Replanning Agent                 │
+       │  • Detects cross-agent contradictory signals & sensor divergences           │
+       │  • Executes safety overrules (e.g. current mild weather vs imminent storms)  │
+       │  • Calculates safe alternate time windows for planned activities            │
+       └──────────────────┬──────────────────────────────────────────┬───────────────┘
+                          │                                          │
+           (If Multi-City)│                                          ▼
+                          ▼                         ┌────────────────────────────────┐
+       ┌──────────────────────────────────────┐     │ 8. Live Groq LLM Agent         │
+       │ 7. City Intelligence Agent           │     │ • LLaMA 3.3 70B synthesis      │
+       │ • Side-by-side ranking & comparison  │     │ • Executive verdict summary    │
+       │ • Multi-destination winner margins   │     │ • Gear & clothing advice       │
+       └──────────────────┬───────────────────┘     │ • Interactive AI Copilot chat  │
+                          │                         └────────────────┬───────────────┘
+                          └──────────────────────────────────────────┘
+                                              │
+                                              ▼
+       ┌─────────────────────────────────────────────────────────────────────────────┐
+       │                     Executive Frontend Results Dashboard                    │
+       │  • Hero Verdict Card & One-Click Copy Executive Summary                     │
+       │  • 4 KPI Metric Cards (Suitability, Risk Index, Trend, Data Quality)        │
+       │  • Categorized Tabs: Risk Radar, Trajectory Shifts, Comfort, JSON Telemetry │
+       │  • Multi-City Comparative Matrix & Real-Time AI Copilot Panel               │
+       └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ### Detailed Agent Roles:
 
 1. **AI Orchestrator (`orchestratorAgent.js`)**:
-   - Parses the user prompt, determines the primary intent (activity check, risk assessment, general forecast, or city comparison), selects the active city coordinates, and maps out an optimal agent execution plan.
+   - Parses user prompts, detects intent (single-city activity check, risk audit, forward forecast, or multi-city comparison), resolves entity coordinates, and constructs a dynamic execution pipeline.
 2. **Data Intelligence Agent (`dataIntelligenceAgent.js`)**:
-   - Acts as a quality gatekeeper. Validates numerical ranges for temperature, humidity, wind, UV, and pressure. Ensures data sufficiency before allowing downstream AI computations.
+   - Acts as a quality gatekeeper. Validates numerical ranges for temperature, humidity, wind, UV, and pressure. Ensures data sufficiency (>80% quality score) before allowing downstream AI computations.
 3. **Risk Intelligence Agent (`riskIntelligenceAgent.js`)**:
    - Computes weighted risk indices across 5 dimensions: **Heat Stress**, **UV Exposure**, **Precipitation**, **Wind Velocity**, and **Visibility**.
    - Detects complex parameter interactions (e.g., moderate heat + high humidity = heightened thermal exhaustion hazard).
 4. **Forecast Trend Agent (`forecastTrendAgent.js`)**:
    - Ingests 40 multi-hour forecast records to calculate moving slopes, identifying whether conditions are **IMPROVING**, **STABLE**, or **WORSENING**, and pinpointing exact shifts in temperature, rain chance, and wind.
-5. **Activity Decision Agent (`activityDecisionAgent.js`)**:
-   - Combines activity risk with the forecast trend offset to classify suitability:
+5. **Weather Reasoning Agent (`weatherReasoningAgent.js`)**:
+   - Performs bio-meteorological comfort modeling (Humidex & Wind Chill) and classifies atmospheric sensation (`Comfortable`, `Cool`, `Uncomfortable`, `Very Uncomfortable`).
+6. **Activity Decision Agent (`activityDecisionAgent.js`)**:
+   - Combines environmental risk with forecast trend offsets to classify suitability:
      - `EXCELLENT` (≥80) • `GOOD` (≥65) • `MODERATE` (≥45) • `POOR` (≥25) • `UNSUITABLE` (<25)
    - Compiles positive green-flag factors, cautionary watch points, and final actionable advice.
-6. **Weather Reasoning Agent (`weatherReasoningAgent.js`)**:
-   - Performs thermal comfort modeling (`Comfortable`, `Cool`, `Uncomfortable`, `Very Uncomfortable`) and explains physiological sensations.
-7. **City Intelligence Agent (`cityIntelligenceAgent.js`)**:
-   - Ranks multiple destinations side-by-side for travel and event planning, spotlighting winner margins.
-8. **Live Groq LLM Intelligence Agent (`groqService.js`)**:
-   - Synthesizes composite meteorological telemetry into actionable natural-language executive verdicts, optimal time windows, clothing & gear recommendations, and powers the interactive multi-turn Live AI Copilot.
+7. **Conflict Arbitration & Replanning Agent (`conflictArbitrationAgent.js`)**:
+   - Evaluates cross-agent divergences (e.g., pleasant current temperature contradicting forward forecast downpours, or brisk winds masking extreme UV radiation).
+   - Enforces conservative safety overrules, reconciles conflicting verdicts, and suggests optimal alternate time windows for planned activities.
+8. **City Intelligence Agent (`cityIntelligenceAgent.js`)**:
+   - Ranks multiple destinations side-by-side for travel and event planning, spotlighting winner margins, climate contrasts, and activity suitability across cities.
+9. **Live Groq LLM Intelligence Agent (`groqService.js`)**:
+   - Powered by LLaMA 3.3 70B Versatile. Synthesizes composite meteorological telemetry into actionable natural-language executive verdicts, optimal time windows, clothing & gear recommendations, and powers the interactive multi-turn Live AI Copilot.
 
 ---
 
@@ -103,7 +121,7 @@ Traditional weather apps only display isolated statistics—temperatures, percen
   - Express 5
   - Groq SDK (`groq-sdk` with LLaMA 3.3 70B Versatile inference)
   - OpenWeatherMap API (Current weather, 5-day / 3-hour forecasts, Geocoding)
-  - Multi-Agent Orchestration Engine (Data, Risk, Trend, Activity, City, Reasoning, Groq LLM)
+  - Multi-Agent Orchestration Engine (Data Intelligence, Risk, Trend, Reasoning, Activity Decision, Conflict Arbitration, City Intelligence, Groq LLM)
 
 ---
 
