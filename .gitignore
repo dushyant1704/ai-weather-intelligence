@@ -32,3 +32,6 @@ dist-ssr
 backend/.env
 backend/.env.*
 !backend/.env.example
+
+.vercel
+.env*
